@@ -11,4 +11,8 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 
 [*.md]
+max_line_length = off
 trim_trailing_whitespace = false
+
+[*.{js,jsx,cjs,mjs,ts,tsx}]
+quote_type = single

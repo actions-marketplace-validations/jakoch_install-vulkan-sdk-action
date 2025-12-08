@@ -1,0 +1,52 @@
+// For format details, see https://aka.ms/devcontainer.json
+{
+  "name": "Debian",
+  "build": {
+    "dockerfile": "./Dockerfile",
+    // sets the run context to this .devcontainer folder
+    "context": "."
+  },
+  // Features to add to the dev container. More info: https://containers.dev/features
+  "features": {
+    // cli tools, zsh, setup a non-root user.
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "configureZshAsDefaultShell": "true",
+      "installOhMyZsh": "true",
+      "upgradePackages": "true",
+      "username": "vscode"
+    },
+    // integrate ZSH plugins: git, auto-suggestions, auto-completions
+    "ghcr.io/devcontainers-extra/features/zsh-plugins:0": {
+      "plugins": "git zsh-autosuggestions zsh-completions",
+      "omzPlugins": "https://github.com/zsh-users/zsh-autosuggestions https://github.com/zsh-users/zsh-completions",
+      "username": "vscode"
+    }
+  },
+  // Set container specific settings.json values on container create.
+  "customizations": {
+    // Configure properties specific to VS Code.
+    "vscode": {
+      // Add the IDs of extensions you want installed when the container is created.
+      "extensions": [
+        // EditorConfig
+        "EditorConfig.EditorConfig",
+        "firsttris.vscode-jest-runner",
+        // biome
+        "biomejs.biome",
+        // Github Actions
+        "github.vscode-github-actions",
+        // jest
+        "orta.vscode-jest"
+      ]
+    },
+    "settings": {
+      "extensions.ignoreRecommendations": true,
+      "terminal.integrated.defaultProfile.linux": "zsh",
+      "terminal.integrated.shell.linux": "/bin/zsh",
+      // tell VSCode that you want the shell to be a login, interactive shell
+      "terminal.integrated.shellArgs.linux": ["-l", "-i"]
+    }
+  },
+  "remoteUser": "root"
+}

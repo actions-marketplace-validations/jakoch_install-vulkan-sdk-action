@@ -2,7 +2,7 @@
 # A Github Action which installs the Vulkan SDK and Runtime.
 #
 # Copyright 2021 Jens A. Koch.
-# SPDX-License-Identifier: BSL-1.0
+# SPDX-License-Identifier: MIT
 #
 
 name: "Install Vulkan SDK and Runtime"
@@ -17,7 +17,7 @@ inputs:
     description: "The Vulkan SDK version to download. Default: latest version."
     required: false
   destination:
-    description: "The installation folder for the Vulkan SDK. Default: see ReadMe."
+    description: "The installation folder for the Vulkan SDK. Default: see Readme."
     required: false
   optional_components:
     description: "Comma-separated list of components to install. See Readme. Default: Only SDK, no optional components."
@@ -25,11 +25,26 @@ inputs:
   install_runtime:
     description: "Windows only. Installs the vulkan runtime (vulkan-1.dll). Default: false."
     required: false
+  install_runtime_only:
+    description: "Windows only. Disables the installation of the Vulkan SDK and installs only runtimes. Default: false."
+    required: false
   cache:
     description: "Cache the Vulkan installation folder. Default: false."
     required: false
   stripdown:
     description: "Reduces the Vulkan SDK size before caching. Default: false."
+    required: false
+  install_swiftshader:
+    description: "Windows only. Installs Google's SwiftShader software rasterizer. Default: false."
+    required: false
+  swiftshader_destination:
+    description: "The installation folder for SwiftShader. Default: see Readme."
+    required: false
+  install_lavapipe:
+    description: "Windows only. Installs Mesa's Lavapipe software rasterizer. Default: false."
+    required: false
+  lavapipe_destination:
+    description: "The installation folder for Lavapipe. Default: see Readme."
     required: false
 
 outputs:
@@ -39,5 +54,5 @@ outputs:
     description: "Location of the Vulkan SDK"
 
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'

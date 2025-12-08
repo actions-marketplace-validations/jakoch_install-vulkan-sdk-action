@@ -7,9 +7,23 @@ updates:
     # Check the npm registry for updates weekly
     schedule:
       interval: 'weekly'
+    commit-message:
+      prefix: "deps(npm): "
+    labels:
+      - "dependencies"
+    # ignore all patch level updates
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
   # Enable version updates for github-actions
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       # Check for updates to GitHub Actions once a month
       interval: 'weekly'
+    commit-message:
+      prefix: "deps(gha): "
+    labels:
+      - "dependencies"  
+
+

@@ -1,0 +1,17 @@
+#
+# .gitattributes
+#
+
+# Auto-detect text files, ensure they use LF.
+* text=auto eol=lf
+
+#
+# cut the fat
+# this stuff is removed when doing git export to keep the zip file small.
+#
+/.github export-ignore
+/.devcontainer export-ignore
+
+.editorconfig export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore

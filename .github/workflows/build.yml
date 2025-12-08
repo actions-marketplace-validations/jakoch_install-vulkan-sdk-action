@@ -1,66 +1,99 @@
+#
+# SPDX-FileCopyrightText: 2021-2025 Jens A. Koch.
+# SPDX-License-Identifier: MIT
+#
+# This file is part of https://github.com/jakoch/install-vulkan-sdk-action
+
 name: "🚀 Build and Test"
 
-on: # rebuild any PRs and main & release branch changes
+on:
+  # You can manually run this workflow.
+  workflow_dispatch:
+  # Run the workflow on Pull Requests.
   pull_request:
+  # Run the worflow for changes to main and release branch.
   push:
     branches:
       - main
+      - 'dev/*'
       - 'releases/*'
 
 jobs:
 
 # ---------------------------------------------------------------------------------------
 
-  build: # make sure build/ci works properly (action development)
+  build: # makes sure the build/ci works properly (action development)
 
 # ---------------------------------------------------------------------------------------
 
+    name: "Build and Test"
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@v4 # https://github.com/actions/checkout
+      - name: 🤘 Checkout Code
+        uses: actions/checkout@v6 # https://github.com/actions/checkout
 
-      - run: |
+      - name: Install
+        run: |
           npm install
 
-      - run: |
+      - name: Run all script steps
+        run: |
           npm run all
 
+      - name: Create Coverage Report
+        run: |
+          npm run test:cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5 # https://github.com/codecov/codecov-action
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: true
+
 # ---------------------------------------------------------------------------------------
 
-  test: # make sure the action works on a clean machine without building (user case)
+  test-latest-version: # makes sure the action works on a clean machine without building (user case)
 
 # ---------------------------------------------------------------------------------------
 
-    name: Build on ${{ matrix.config.OS }}
+    # install latest version sdk on all platforms
+    name: Install latest SDK on ${{ matrix.config.OS }}
     runs-on: ${{ matrix.config.OS }}
 
     strategy:
       fail-fast: false
       matrix:
         config:
-          # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
-          - { OS: windows-2022 }
-          - { OS: ubuntu-22.04 }
-          #- { OS: macos-12     } disabled
+          # https://github.com/actions/runner-images/tree/main/images
+          - { OS: windows-2025 }
+          - { OS: ubuntu-24.04 }
+          - { OS: ubuntu-24.04-arm }
+          - { OS: macos-15     }
+          #- { OS: macos-15-arm }
+          - { OS: windows-11-arm }
 
     steps:
 
-      - name: 🤘 Checkout Code
-        uses: actions/checkout@v4 # https://github.com/actions/checkout
+      # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#runner-context
+      - name: Runner OS
+        run: |
+          echo "We are running on ${{ runner.os }} with arch ${{ runner.arch }}."
+          node -e "console.log(require('os').platform() + '-' + require('os').arch())"
 
-      - name: Use own action
+      - name: 🤘 Checkout Code
+        uses: actions/checkout@v6 # https://github.com/actions/checkout
+
+      - name: Use own action - test latest version
         uses: ./
         with:
           # Vulkan SDK version to download. Default: latest version.
-          vulkan_version: 1.3.250.1
-          # test with intentionally wrong version
-          # should say version not available
-          # should print list of valid versions
-          #vulkan_version: 1.2.3.4
+          vulkan_version: latest
           optional_components: com.lunarg.vulkan.vma, com.lunarg.vulkan.volk
           install_runtime: true
-          cache: true
+          cache: false
           stripdown: true
 
       - name: Show Env Vars and SDK folder (Linux)
@@ -83,3 +116,311 @@ jobs:
           Get-ChildItem -File -Recurse
           $folderSizeMB = (Get-ChildItem -File -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
           "Folder size: {0:N2} MB" -f $folderSizeMB
+
+      - name: Show Env Vars and SDK folder (MAC)
+        if: contains(matrix.config.OS, 'mac')
+        run: |
+          echo PATH = $PATH
+          echo VULKAN_VERSION = $VULKAN_VERSION
+          echo VULKAN_SDK = $VULKAN_SDK
+          echo VK_LAYER_PATH = $VK_LAYER_PATH
+          echo DYLD_LIBRARY_PATH = $DYLD_LIBRARY_PATH
+          echo Folder size = `du -hs $VULKAN_SDK`
+
+# ---------------------------------------------------------------------------------------
+
+  test-old-version: # makes sure the action works on a clean machine without building (user case)
+
+# ---------------------------------------------------------------------------------------
+
+    # install old version sdk on all platforms
+    name: Install old SDK on ${{ matrix.config.OS }}
+    runs-on: ${{ matrix.config.OS }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          # https://github.com/actions/runner-images/tree/main/images
+          - { OS: windows-2025 }
+          - { OS: ubuntu-24.04 }
+          #- { OS: ubuntu-24.04-arm } disabled, because downloads not ready yet
+          - { OS: macos-15     }
+          #- { OS: macos-15-arm }
+
+    steps:
+
+      - name: 🤘 Checkout Code
+        uses: actions/checkout@v6 # https://github.com/actions/checkout
+
+      #- name: Use own action - test wrong version number
+      #  uses: ./
+      #  with:
+      #    # Vulkan SDK version to download. Default: latest version.
+      #    # test with intentionally wrong version
+      #    # should say version not available
+      #    # should print list of valid versions
+      #    vulkan_version: 1.2.3.4
+
+      - name: Use own action - from 1.4.328.1 archive is tar.xz on linux
+        uses: ./
+        with:
+          # Vulkan SDK version to download. Default: latest version.
+          vulkan_version:  1.4.328.1
+          optional_components: com.lunarg.vulkan.vma, com.lunarg.vulkan.volk
+          install_runtime: true
+          cache: false
+          stripdown: true
+
+      - name: Show Env Vars and SDK folder (Linux)
+        if: contains(matrix.config.OS, 'ubuntu')
+        run: |
+          echo PATH = $PATH
+          echo VULKAN_VERSION = $VULKAN_VERSION
+          echo VULKAN_SDK = $VULKAN_SDK
+          echo VK_LAYER_PATH = $VK_LAYER_PATH
+          echo LD_LIBRARY_PATH = $LD_LIBRARY_PATH
+          echo Folder size = `du -hs $VULKAN_SDK`
+
+      - name: Show Env Vars and SDK folder (Windows)
+        if: contains(matrix.config.OS, 'windows')
+        working-directory: ${{env.VULKAN_SDK}}
+        run: |
+          echo $env:PATH
+          echo $env:VULKAN_VERSION
+          echo $env:VULKAN_SDK
+          Get-ChildItem -File -Recurse
+          $folderSizeMB = (Get-ChildItem -File -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+          "Folder size: {0:N2} MB" -f $folderSizeMB
+
+      - name: Show Env Vars and SDK folder (MAC)
+        if: contains(matrix.config.OS, 'mac')
+        run: |
+          echo PATH = $PATH
+          echo VULKAN_VERSION = $VULKAN_VERSION
+          echo VULKAN_SDK = $VULKAN_SDK
+          echo VK_LAYER_PATH = $VK_LAYER_PATH
+          echo DYLD_LIBRARY_PATH = $DYLD_LIBRARY_PATH
+          echo Folder size = `du -hs $VULKAN_SDK`
+
+# ---------------------------------------------------------------------------------------
+
+  test-rasterizers-latest-version:
+
+# ---------------------------------------------------------------------------------------
+
+    # install latest version of vulkan sdk and both rasterizers on windows
+    name: Install rasterizers on ${{ matrix.config.OS }}
+    runs-on: ${{ matrix.config.OS }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          # https://github.com/actions/runner-images/tree/main/images
+          - { OS: windows-2025 }
+          #- { OS: ubuntu-24.04 }
+          #- { OS: ubuntu-24.04-arm }
+          #- { OS: macos-15     }
+          #- { OS: macos-15-arm }
+
+    steps:
+
+      - name: 🤘 Checkout Code
+        uses: actions/checkout@v6 # https://github.com/actions/checkout
+
+      - name: Use own action - test latest version
+        uses: ./
+        with:
+          # Vulkan SDK version to download. Default: latest version.
+          vulkan_version: latest
+          optional_components: com.lunarg.vulkan.vma
+          install_runtime: false
+          cache: false
+          stripdown: true
+          # Swiftshader. Default: latest version.
+          install_swiftshader: true
+          # Lavapipe. Default: latest version.
+          install_lavapipe: true
+
+      - name: List Files
+        if: contains(matrix.config.OS, 'windows')
+        shell: cmd
+        run: |
+          if exist C:\Swiftshader (
+            dir /s C:\Swiftshader
+          )
+          if exist C:\Lavapipe (
+            dir /s C:\Lavapipe
+          )
+
+      # Generate vulkaninfo profiles for both rasterizers (lavapipe_profile.json, swiftshader_profile.json).
+      # Register both drivers via ICD (Installable Client Driver) files in the Windows Registry before running vulkaninfoSDK.exe.
+      # The steps are splitted to easily access the "Output Device Name from Profile" in the CI logs.
+
+      - name: (Lavapipe) Register Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\lavapipe\share\vulkan\icd.d\lvp_icd.x86_64.json" /t REG_DWORD /d 0 /f
+
+      - name: (Lavapipe) Run vulkaninfoSDK
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          vulkaninfoSDK.exe -j -o lavapipe_profile.json
+          Get-Content -Raw lavapipe_profile.json
+
+      - name: (Lavapipe) Output Device Name from Profile
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          jq -r '.capabilities.device.properties.VkPhysicalDeviceProperties.deviceName' lavapipe_profile.json
+
+      - name: (Lavapipe) Unregister Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg delete "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\lavapipe\share\vulkan\icd.d\lvp_icd.x86_64.json" /f
+
+      - name: (SwiftShader) Register Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\Swiftshader\vk_swiftshader_icd.json" /t REG_DWORD /d 0 /f
+
+      - name: (SwiftShader) Run vulkaninfoSDK
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          vulkaninfoSDK.exe -j -o swiftshader_profile.json
+          Get-Content -Raw swiftshader_profile.json
+
+      - name: (SwiftShader) Output Device Name from Profile
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          jq -r '.capabilities.device.properties.VkPhysicalDeviceProperties.deviceName' swiftshader_profile.json
+
+      - name: (SwiftShader) Unregister Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg delete "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\Swiftshader\vk_swiftshader_icd.json" /f
+
+      #- name: Show Env Vars and SDK folder (Linux)
+      #  if: contains(matrix.config.OS, 'ubuntu')
+      #  run: |
+      #    echo PATH = $PATH
+      #    echo VULKAN_VERSION = $VULKAN_VERSION
+      #    echo VULKAN_SDK = $VULKAN_SDK
+      #    echo VK_LAYER_PATH = $VK_LAYER_PATH
+      #    echo LD_LIBRARY_PATH = $LD_LIBRARY_PATH
+      #    echo Folder size = `du -hs $VULKAN_SDK`
+
+      - name: Show Env Vars and SDK folder (Windows)
+        if: contains(matrix.config.OS, 'windows')
+        working-directory: ${{env.VULKAN_SDK}}
+        run: |
+          echo $env:PATH
+          echo $env:VULKAN_VERSION
+          echo $env:VULKAN_SDK
+          Get-ChildItem -File -Recurse
+          $folderSizeMB = (Get-ChildItem -File -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+          "Folder size: {0:N2} MB" -f $folderSizeMB
+
+      #- name: Show Env Vars and SDK folder (MAC)
+      #  if: contains(matrix.config.OS, 'mac')
+      #  run: |
+      #    echo PATH = $PATH
+      #    echo VULKAN_VERSION = $VULKAN_VERSION
+      #    echo VULKAN_SDK = $VULKAN_SDK
+      #    echo VK_LAYER_PATH = $VK_LAYER_PATH
+      #    echo DYLD_LIBRARY_PATH = $DYLD_LIBRARY_PATH
+      #    echo Folder size = `du -hs $VULKAN_SDK`
+
+# ---------------------------------------------------------------------------------------
+
+  test-runtime-only-with-lavapipe:
+
+# ---------------------------------------------------------------------------------------
+
+    name: Install runtime_only with Lavapipe on ${{ matrix.config.OS }}
+    runs-on: ${{ matrix.config.OS }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          # https://github.com/actions/runner-images/tree/main/images
+          - { OS: windows-2025 }
+
+    steps:
+
+      - name: 🤘 Checkout Code
+        uses: actions/checkout@v6 # https://github.com/actions/checkout
+
+      - name: Use own action - test latest version
+        uses: ./
+        with:
+          # This will install only the runtime (vulkan-1.dll), not the full SDK.
+          install_runtime_only: true
+          cache: false
+          # Lavapipe. Default: latest version.
+          install_lavapipe: true
+
+      - name: Show Env Vars and SDK folder (Windows)
+        if: contains(matrix.config.OS, 'windows')
+        working-directory: ${{env.VULKAN_SDK}}
+        run: |
+          echo $env:PATH
+          echo $env:VULKAN_VERSION
+          echo $env:VULKAN_SDK
+          Get-ChildItem -File -Recurse
+          $folderSizeMB = (Get-ChildItem -File -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+          "Folder size: {0:N2} MB" -f $folderSizeMB
+
+      - name: List Files
+        if: contains(matrix.config.OS, 'windows')
+        shell: cmd
+        run: |
+          if exist C:\Lavapipe (
+            dir /s C:\Lavapipe
+          )
+
+      # Generate vulkaninfo profiles for both rasterizers (lavapipe_profile.json, swiftshader_profile.json).
+      # Register both drivers via ICD (Installable Client Driver) files in the Windows Registry before running vulkaninfoSDK.exe.
+      # The steps are splitted to easily access the "Output Device Name from Profile" in the CI logs.
+
+      - name: (Lavapipe) Register Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\lavapipe\share\vulkan\icd.d\lvp_icd.x86_64.json" /t REG_DWORD /d 0 /f
+
+      # And of course the file is named vulkaninfoSDK.exe when from the SDK
+      # and named vulkaninfo.exe when from the runtime only package.
+      # I see we love consistency at LunarG... :)
+      #working-directory: ${{env.VULKAN_SDK}}\${{env.VULKAN_VERSION}}\runtime\x64
+      - name: (Lavapipe) Run vulkaninfoSDK
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          $vulkanPath = Join-Path $env:VULKAN_SDK $env:VULKAN_VERSION
+          Set-Location "$vulkanPath\runtime\x64"
+          .\vulkaninfo.exe -j -o lavapipe_profile.json
+          Get-Content -Raw lavapipe_profile.json
+
+      - name: (Lavapipe) Output Device Name from Profile
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          $vulkanPath = Join-Path $env:VULKAN_SDK $env:VULKAN_VERSION
+          Set-Location "$vulkanPath\runtime\x64"
+          jq -r '.capabilities.device.properties.VkPhysicalDeviceProperties.deviceName' lavapipe_profile.json
+
+      - name: (Lavapipe) Unregister Driver
+        if: contains(matrix.config.OS, 'windows')
+        shell: pwsh
+        run: |
+          reg delete "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\lavapipe\share\vulkan\icd.d\lvp_icd.x86_64.json" /f

@@ -1,14 +1,20 @@
 {
+  // biome-ignore format: keep aligned comments
   "compilerOptions": {
-    "target": "ES2020",                          /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019' or 'ESNEXT'. */
-    "module": "commonjs",                     /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', or 'ESNext'. */
-    "newLine": "lf",                          /* End of line sequence = lf = (unix) */
-    "outDir": "./lib",                        /* Redirect output structure to the directory. */
-    "rootDir": "./src",                       /* Specify the root directory of input files. Use to control the output directory structure with --outDir. */
-    "strict": true,                           /* Enable all strict type-checking options. */
-    "noImplicitAny": true,                    /* Raise error on expressions and declarations with an implied 'any' type. */
-    "esModuleInterop": true,                  /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */
-    "sourceMap": true
+    "target": "ES2020",                        // Specify ECMAScript target version.
+    "module": "CommonJS",                      // Specify module code generation.
+    "newLine": "lf",                           // End of line sequence = lf = (unix)
+    "outDir": "./lib",                         // Redirect output structure to the directory.
+    "rootDir": "./src",                        // Specify the root directory of input files. Use to control the output directory structure with --outDir.
+    "strict": true,                            // Enable all strict type-checking options.
+    "noImplicitAny": true,                     // Raise error on expressions and declarations with an implied 'any' type.
+    "noImplicitOverride": true,                // Ensure overriding members in derived classes are marked with an 'override' modifier.
+    "noImplicitThis": true,                    // Raise error on 'this' expressions with an implied 'any' type.
+    "noUnusedLocals": true,                    // Report errors on unused locals.
+    "esModuleInterop": true,                   // Emit additional JavaScript to ease support for importing CommonJS modules.
+    "forceConsistentCasingInFileNames": true,  // Disallow inconsistently-cased references to the same file.
+    "useDefineForClassFields": false,          // Emit a class field definition with a declare modifier when a field is declared.
+    "sourceMap": true,                         // Generates corresponding '.map' file.
   },
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "exclude": ["node_modules", "tests"]
 }
