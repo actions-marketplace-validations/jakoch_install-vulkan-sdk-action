@@ -35,8 +35,8 @@
   ],
   "main": "lib/main.js",
   "dependencies": {
-    "@actions/cache": "^4",
-    "@actions/core": "^1",
+    "@actions/cache": "^5",
+    "@actions/core": "^2",
     "@actions/http-client": "^3",
     "@actions/io": "^2",
     "@actions/tool-cache": "^2"
@@ -45,7 +45,7 @@
     "@biomejs/biome": "^2",
     "@github/local-action": "^6.0.0",
     "@types/jest": "^30",
-    "@types/node": "^24.10",
+    "@types/node": "^25.0",
     "@vercel/ncc": "^0.38.4",
     "husky": "^9.1.7",
     "jest": "^30",
