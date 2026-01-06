@@ -1,7 +1,7 @@
-/*---------------------------------------------------------------------------------------------
- *  SPDX-FileCopyrightText: 2021-2025 Jens A. Koch
+/*-----------------------------------------------------------------------------
+ *  SPDX-FileCopyrightText: 2021-2026 Jens A. Koch
  *  SPDX-License-Identifier: MIT
- *--------------------------------------------------------------------------------------------*/
+ *----------------------------------------------------------------------------*/
 
 import * as cache from '@actions/cache'
 import * as core from '@actions/core'
@@ -145,7 +145,7 @@ export async function run(): Promise<void> {
 
       // Verify installation of Vulkan Runtime
       if (installerVulkan.verifyInstallationOfRuntime(runtimePath)) {
-        core.info(`✔️ [INFO] Path to Vulkan Runtime: ${runtimePath}`)
+        core.info(`ℹ️ [INFO] Path to Vulkan Runtime: ${runtimePath}`)
       } else {
         core.warning(`Could not find Vulkan Runtime in ${runtimePath}`)
       }
@@ -212,7 +212,7 @@ export async function run(): Promise<void> {
       if ((platform.IS_WINDOWS || platform.IS_WINDOWS_ARM) && inputs.installRuntime) {
         const runtimePath = path.normalize(`${installPath}/runtime`)
         if (installerVulkan.verifyInstallationOfRuntime(runtimePath)) {
-          core.info(`✔️ [INFO] Path to Vulkan Runtime: ${runtimePath}`)
+          core.info(`ℹ️ [INFO] Path to Vulkan Runtime: ${runtimePath}`)
         } else {
           core.warning(`Could not find Vulkan Runtime in ${runtimePath}`)
         }
@@ -220,13 +220,25 @@ export async function run(): Promise<void> {
     }
 
     /* ----------------------------------------------------------------------
+     * Setup Rasterizer Drivers
+     * ---------------------------------------------------------------------- */
+    const icdFiles: string[] = []
+    const pathEntries: string[] = []
+
+    /* ----------------------------------------------------------------------
      * Install SwiftShader
      * ---------------------------------------------------------------------- */
 
     if (platform.IS_WINDOWS && inputs.installSwiftshader) {
       core.info(`🚀 Installing SwiftShader library...`)
-      const swiftshaderInstallPath = await installerSwiftshader.installSwiftShader(inputs.swiftshaderDestination)
-      core.info(`✔️ [INFO] Path to SwiftShader: ${swiftshaderInstallPath}`)
+      const swiftshaderInstallPath = await installerSwiftshader.installSwiftShader(
+        inputs.swiftshaderDestination,
+        inputs.useCache
+      )
+      const swiftshaderIcds = installerSwiftshader.setupSwiftshader(swiftshaderInstallPath) || []
+      pathEntries.push(swiftshaderInstallPath)
+      icdFiles.push(...swiftshaderIcds)
+      core.info(`ℹ️ [INFO] Path to SwiftShader: ${swiftshaderInstallPath}`)
     }
 
     /* ----------------------------------------------------------------------
@@ -235,8 +247,23 @@ export async function run(): Promise<void> {
 
     if (platform.IS_WINDOWS && inputs.installLavapipe) {
       core.info(`🚀 Installing Lavapipe library...`)
-      const LavapipeInstallPath = await installerLavapipe.installLavapipe(inputs.lavapipeDestination)
-      core.info(`✔️ [INFO] Path to Lavapipe: ${LavapipeInstallPath}`)
+      const lavapipeInstallPath = await installerLavapipe.installLavapipe(inputs.lavapipeDestination, inputs.useCache)
+      const lavapipeIcds = installerLavapipe.setupLavapipe(lavapipeInstallPath) || []
+      pathEntries.push(lavapipeInstallPath)
+      icdFiles.push(...lavapipeIcds)
+      core.info(`ℹ️ [INFO] Path to Lavapipe: ${lavapipeInstallPath}`)
+    }
+
+    /* ----------------------------------------------------------------------
+     * Setup Environment Variables for Rasterizers (VK_DRIVER_FILES, PATH)
+     * ---------------------------------------------------------------------- */
+
+    if (platform.IS_WINDOWS && (inputs.installSwiftshader || inputs.installLavapipe)) {
+      const icdList = icdFiles.join(';')
+      core.exportVariable('VK_DRIVER_FILES', icdList)
+      core.info(`✔️ [ENV] Set VK_DRIVER_FILES -> "${icdList}".`)
+      pathEntries.forEach(p => core.addPath(p))
+      core.info(`✔️ [PATH] Added rasterizer library paths to environment variable PATH.`)
     }
 
     core.info(`✅ Done.`)
