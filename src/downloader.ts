@@ -3,20 +3,19 @@
  *  SPDX-License-Identifier: MIT
  *----------------------------------------------------------------------------*/
 
+import * as path from 'node:path'
 import * as core from '@actions/core'
 import * as tc from '@actions/tool-cache' // https://github.com/actions/toolkit/tree/main/packages/tool-cache
-import * as path from 'node:path'
-import * as http from './http'
 import * as errors from './errors'
+import * as http from './http'
 import * as platform from './platform'
+import { compareFileSha } from './verify'
 import * as versions from './versions'
 import * as versionsVulkan from './versions_vulkan'
-import { compareFileSha } from './verify'
 
 /**
  * Get download url for Vulkan SDK.
  *
- * @export
  * @param {string} version - The SDK version to download.
  * @return {*}  {Promise<string>} Returns the download url.
  */
@@ -98,7 +97,6 @@ export async function getUrlVulkanSdk(version: string): Promise<string> {
  * Normalized:      https://sdk.lunarg.com/sdk/download/1.4.304.0/warm/vulkan-runtime-components.zip
  * Versionized:     https://sdk.lunarg.com/sdk/download/1.4.304.0/warm/VulkanRT-ARM64-1.4.304.0-Installer.exe
  *
- * @export
  * @param {string} version - The runtime version to download.
  * @return {*}  {Promise<string>} Returns the download url.
  */
@@ -151,7 +149,6 @@ export async function getUrlVulkanRuntime(version: string): Promise<string> {
 /**
  * Download Vulkan SDK.
  *
- * @export
  * @param {string} version - The version to download.
  * @return {*}  {Promise<string>} Download location.
  */
@@ -184,7 +181,6 @@ export async function downloadVulkanSdk(version: string): Promise<string> {
  *    installVulkanRuntimeFromSdk() in installer_vulkan.ts.
  * 2) This is used, if the user wants to install only the runtime without SDK!
  *
- * @export
  * @param {string} version - The version to download.
  * @return {*}  {Promise<string>} Download location.
  */
@@ -201,7 +197,6 @@ export async function downloadVulkanRuntime(version: string): Promise<string> {
 /**
  * Returns the platform-based name for the Vulkan SDK archive or installer.
  *
- * @export
  * @param {string} version- The vulkan sdk version number string.
  * @return {*}  {string} Platform-based name for the Vulkan SDK archive or installer.
  */

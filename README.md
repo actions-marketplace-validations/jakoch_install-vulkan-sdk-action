@@ -106,6 +106,10 @@ The following inputs can be used as `steps.with` keys:
 | `swiftshader_destination`| String  | The installation folder for SwiftShader. | Windows: `C:\swiftshader`. Linux/MacOS: `%HOME/swiftshader` | false
 | `install_lavapipe`       | bool    | Windows only. Installs Mesa's Lavapipe software rasterizer. Default: false. | false
 | `lavapipe_destination`   | String  | The installation folder for Lavapipe.    | Windows: `C:\lavapipe`. Linux/MacOS: `%HOME/lavapipe` | false
+| `github_token`           | String  | The Github token (github_token: ${{ secrets.GITHUB_TOKEN }}). | -- | false
+
+The GitHub token is only needed if your workflow makes more than 60 API requests, such as when using a large build matrix or building often.
+The GitHub token is needed by this action to fetch the latest release of a repository via the API (org/repo/releases/latest).
 
 ### Outputs
 
@@ -207,6 +211,8 @@ These JSON files tell the Vulkan loader:
 
 In order to work with a driver, you have to register them in the Windows registry.
 
+- [Vulkan LoaderDriverInterface](https://vulkan.lunarg.com/doc/view/latest/mac/LoaderDriverInterface.html)
+
 #### Typical Driver Loading Flow
 
 When you run the Vulkan Info Tool (`vulkaninfoSDK.exe`):
@@ -278,7 +284,9 @@ To make SwiftShader available as a Vulkan renderer, you must register it as an I
 
 This is done by placing its JSON manifest file, which identifies the ICD and provides the path to the driver DLL, into the Windows registry.
 
-You can do this using PowerShell with the following command:
+The action performs this step for you. Manual registration is not required, but if needed,
+
+you can do it using PowerShell with the following command:
 
 ```
 reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\Swiftshader\vk_swiftshader_icd.json" /t REG_DWORD /d 0 /f
@@ -355,8 +363,9 @@ To make Lavapipe available as a Vulkan renderer, you must register it as an Inst
 
 This is done by placing its JSON manifest file, which identifies the ICD and provides the path to the driver DLL, into the Windows registry.
 
-You can do this using PowerShell with the following command:
+The action performs this step for you. Manual registration is not required, but if needed,
 
+you can do it using PowerShell with the following command:
 ```
 reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "C:\lavapipe\share\vulkan\icd.d\lvp_icd.x86_64.json" /t REG_DWORD /d 0 /f
 ```

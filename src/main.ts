@@ -3,15 +3,16 @@
  *  SPDX-License-Identifier: MIT
  *----------------------------------------------------------------------------*/
 
+import * as path from 'node:path'
 import * as cache from '@actions/cache'
 import * as core from '@actions/core'
-import * as path from 'node:path'
 import * as downloader from './downloader'
 import * as errors from './errors'
+import { githubTokenStore } from './github'
 import * as input from './inputs'
-import * as installerVulkan from './installer_vulkan'
-import * as installerSwiftshader from './installer_swiftshader'
 import * as installerLavapipe from './installer_lavapipe'
+import * as installerSwiftshader from './installer_swiftshader'
+import * as installerVulkan from './installer_vulkan'
 import * as platform from './platform'
 import * as versionsVulkan from './versions_vulkan'
 
@@ -127,6 +128,13 @@ export async function run(): Promise<void> {
   try {
     const inputs: input.Inputs = await input.getInputs()
 
+    // If the workflow provided a github_token input, store it in the token store
+    // so modules can use it without passing it around.
+    if (inputs.githubToken && inputs.githubToken !== '') {
+      githubTokenStore.setToken(inputs.githubToken)
+      core.info('Using github_token to authenticate GitHub API requests.')
+    }
+
     const version = await versionsVulkan.resolveVersion(inputs.version)
 
     /* ----------------------------------------------------------------------
@@ -220,12 +228,6 @@ export async function run(): Promise<void> {
     }
 
     /* ----------------------------------------------------------------------
-     * Setup Rasterizer Drivers
-     * ---------------------------------------------------------------------- */
-    const icdFiles: string[] = []
-    const pathEntries: string[] = []
-
-    /* ----------------------------------------------------------------------
      * Install SwiftShader
      * ---------------------------------------------------------------------- */
 
@@ -235,10 +237,12 @@ export async function run(): Promise<void> {
         inputs.swiftshaderDestination,
         inputs.useCache
       )
-      const swiftshaderIcds = installerSwiftshader.setupSwiftshader(swiftshaderInstallPath) || []
-      pathEntries.push(swiftshaderInstallPath)
-      icdFiles.push(...swiftshaderIcds)
-      core.info(`ℹ️ [INFO] Path to SwiftShader: ${swiftshaderInstallPath}`)
+      if (installerSwiftshader.verifyInstallation(swiftshaderInstallPath)) {
+        core.info(`ℹ️ [INFO] Path to SwiftShader: ${swiftshaderInstallPath}`)
+        installerSwiftshader.setupSwiftshader(swiftshaderInstallPath)
+      } else {
+        core.warning(`Could not find SwiftShader in ${swiftshaderInstallPath}`)
+      }
     }
 
     /* ----------------------------------------------------------------------
@@ -248,22 +252,12 @@ export async function run(): Promise<void> {
     if (platform.IS_WINDOWS && inputs.installLavapipe) {
       core.info(`🚀 Installing Lavapipe library...`)
       const lavapipeInstallPath = await installerLavapipe.installLavapipe(inputs.lavapipeDestination, inputs.useCache)
-      const lavapipeIcds = installerLavapipe.setupLavapipe(lavapipeInstallPath) || []
-      pathEntries.push(lavapipeInstallPath)
-      icdFiles.push(...lavapipeIcds)
-      core.info(`ℹ️ [INFO] Path to Lavapipe: ${lavapipeInstallPath}`)
-    }
-
-    /* ----------------------------------------------------------------------
-     * Setup Environment Variables for Rasterizers (VK_DRIVER_FILES, PATH)
-     * ---------------------------------------------------------------------- */
-
-    if (platform.IS_WINDOWS && (inputs.installSwiftshader || inputs.installLavapipe)) {
-      const icdList = icdFiles.join(';')
-      core.exportVariable('VK_DRIVER_FILES', icdList)
-      core.info(`✔️ [ENV] Set VK_DRIVER_FILES -> "${icdList}".`)
-      pathEntries.forEach(p => core.addPath(p))
-      core.info(`✔️ [PATH] Added rasterizer library paths to environment variable PATH.`)
+      if (installerLavapipe.verifyInstallation(lavapipeInstallPath)) {
+        core.info(`ℹ️ [INFO] Path to Lavapipe: ${lavapipeInstallPath}`)
+        installerLavapipe.setupLavapipe(lavapipeInstallPath)
+      } else {
+        core.warning(`Could not find Lavapipe in ${lavapipeInstallPath}`)
+      }
     }
 
     core.info(`✅ Done.`)

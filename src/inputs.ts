@@ -3,15 +3,14 @@
  *  SPDX-License-Identifier: MIT
  *----------------------------------------------------------------------------*/
 
-import * as core from '@actions/core'
 import * as path from 'node:path'
+import * as core from '@actions/core'
 import * as platform from './platform'
 import * as versionsVulkan from './versions_vulkan'
 
 /**
  * List of available Input arguments
  *
- * @export
  * @interface Inputs
  */
 export interface Inputs {
@@ -29,6 +28,8 @@ export interface Inputs {
   // Lavapipe inputs
   installLavapipe: boolean
   lavapipeDestination: string
+  // GithubToken
+  githubToken: string
 }
 
 /**
@@ -37,7 +38,6 @@ export interface Inputs {
  * If an input argument requires validation beyond a simple boolean check,
  * individual getter functions are used for incoming argument validation.
  *
- * @export
  * @return {*}  {Promise<Inputs>}
  */
 export async function getInputs(): Promise<Inputs> {
@@ -63,6 +63,12 @@ export async function getInputs(): Promise<Inputs> {
   const inputLavapipeDestination = core.getInput('lavapipe_destination', { required: false })
   //const inputLavapipeVersion = core.getInput('Lavapipe_version', { required: false })
 
+  // Github token
+  // Prefer github_token input over GITHUB_TOKEN env variable
+  const inputGithubToken = core.getInput('github_token', { required: false }) || process.env.GITHUB_TOKEN || ''
+  // mask secret in logs
+  core.setSecret(inputGithubToken)
+
   const inputs = {
     // Vulkan SDK inputs
     version: await getInputVulkanVersion(inputVulkanVersion),
@@ -81,10 +87,16 @@ export async function getInputs(): Promise<Inputs> {
 
     // Lavapipe inputs
     installLavapipe: /true/i.test(inputInstallLavapipe),
-    lavapipeDestination: await getInputLavapipeDestination(inputLavapipeDestination)
+    lavapipeDestination: await getInputLavapipeDestination(inputLavapipeDestination),
     //LavapipeVersion: await getIputLavapipeVersion(inputLavapipeVersion),
     //LavapipeVersionExplicit: inputLavapipeVersion !== '' // used for implicit conditions
+
+    // Github token
+    githubToken: inputGithubToken
   }
+
+  // mask secret in logs
+  core.setSecret(inputs.githubToken)
 
   // Apply implicit conditions
 
@@ -111,7 +123,6 @@ export async function getInputs(): Promise<Inputs> {
  * GetInputVersion validates the "version" argument.
  * If "vulkan_version" was not set or is empty, assume "latest" version.
  *
- * @export
  * @param {string} requested_version
  * @return {*}  {Promise<string>}
  */
@@ -143,7 +154,6 @@ export async function getInputVulkanVersion(requestedVersion: string): Promise<s
  * Validates a version number to conform with the
  * "major.minor.patch.revision" ("1.2.3.4") versioning scheme.
  *
- * @export
  * @param {string} version
  * @return {*}  {boolean}
  */
@@ -190,7 +200,6 @@ export function getInputVulkanDestination(destination: string): string {
  * https://vulkan.lunarg.com/doc/view/latest/windows/getting_started.html#user-content-installing-optional-components
  * list components on windows: "maintenancetool.exe list" or "installer.exe search"
  *
- * @export
  * @param {string} optional_components
  * @return {*}  {string[]}
  */
@@ -269,7 +278,6 @@ function getInputSwiftshaderDestination(destination: string): string {
  * getInputSwiftshaderVersion validates the "swiftshader_version" argument.
  * If "swiftshader_version" was not set or is empty, assume "latest" version.
  *
- * @export
  * @param {string} requested_version
  * @return {*}  {Promise<string>}
  */
@@ -324,7 +332,6 @@ function getInputLavapipeDestination(destination: string): string {
  * getInputVersionMesa validates the "mesa_version" argument.
  * If "mesa_version" was not set or is empty, assume "latest" version.
  *
- * @export
  * @param {string} requested_version
  * @return {*}  {Promise<string>}
  */

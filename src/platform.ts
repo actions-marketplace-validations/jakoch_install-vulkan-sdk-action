@@ -3,8 +3,8 @@
  *  SPDX-License-Identifier: MIT
  *----------------------------------------------------------------------------*/
 
-import * as os from 'node:os'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 
 export const HOME_DIR: string = os.homedir() // $HOME
 export const TEMP_DIR: string = os.tmpdir()
@@ -22,7 +22,6 @@ export const IS_LINUX_ARM: boolean = IS_LINUX && OS_ARCH === 'arm64'
 /**
  * Return a platform name, which can be used as part of the URLs.
  *
- * @export
  * @return {*}  {string} The plaform name (windows, mac, linux).
  */
 export function getPlatform(): string {
@@ -44,7 +43,6 @@ export function getPlatform(): string {
  *
  * Alternative: source /etc/os-release ; echo -n "$VERSION_ID"
  *
- * @export
  */
 export function getLinuxDistributionVersionId(): string {
   const osReleasePath = '/etc/os-release'
