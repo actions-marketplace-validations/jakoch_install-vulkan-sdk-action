@@ -39,11 +39,11 @@
     "@actions/core": "^2",
     "@actions/http-client": "^3",
     "@actions/io": "^2",
-    "@actions/tool-cache": "^2"
+    "@actions/tool-cache": "^3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2",
-    "@github/local-action": "^2.2.1",
+    "@github/local-action": "^6.0.2",
     "@types/jest": "^30",
     "@types/node": "^25.0",
     "@vercel/ncc": "^0.38.4",
