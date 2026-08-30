@@ -31,7 +31,7 @@ jobs:
     steps:
 
       - name: 🤘 Checkout Code
-        uses: actions/checkout@v6 # https://github.com/actions/checkout
+        uses: actions/checkout@v7 # https://github.com/actions/checkout
 
       - name: Install
         run: |
@@ -50,7 +50,7 @@ jobs:
           npm run test:cov
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5 # https://github.com/codecov/codecov-action
+        uses: codecov/codecov-action@v7 # https://github.com/codecov/codecov-action
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
@@ -88,7 +88,7 @@ jobs:
           node -e "console.log(require('os').platform() + '-' + require('os').arch())"
 
       - name: 🤘 Checkout Code
-        uses: actions/checkout@v6 # https://github.com/actions/checkout
+        uses: actions/checkout@v7 # https://github.com/actions/checkout
 
       - name: Use own action - test latest version
         uses: ./
@@ -132,6 +132,22 @@ jobs:
           echo DYLD_LIBRARY_PATH = $DYLD_LIBRARY_PATH
           echo Folder size = `du -hs $VULKAN_SDK`
 
+      # The integration test requires: CMake, C++ compiler, Vulkan SDK
+      - name: Verify Vulkan with CMake (Linux & macOS)
+        if: contains(matrix.config.OS, 'ubuntu') || contains(matrix.config.OS, 'mac')
+        run: |
+          cmake -S tests/integration -B build
+          cmake --build build
+          ./build/vulkan_integration_test
+
+      - name: Verify Vulkan with CMake (Windows)
+        if: contains(matrix.config.OS, 'windows')
+        shell: bash
+        run: |
+          cmake -S tests/integration -B build
+          cmake --build build --config Release
+          ./build/Release/vulkan_integration_test.exe
+
 # ---------------------------------------------------------------------------------------
 
   test-old-version: # makes sure the action works on a clean machine without building (user case)
@@ -156,7 +172,7 @@ jobs:
     steps:
 
       - name: 🤘 Checkout Code
-        uses: actions/checkout@v6 # https://github.com/actions/checkout
+        uses: actions/checkout@v7 # https://github.com/actions/checkout
 
       #- name: Use own action - test wrong version number
       #  uses: ./
@@ -236,7 +252,7 @@ jobs:
     steps:
 
       - name: 🤘 Checkout Code
-        uses: actions/checkout@v6 # https://github.com/actions/checkout
+        uses: actions/checkout@v7 # https://github.com/actions/checkout
 
       - name: Use own action - test latest version
         uses: ./
@@ -333,7 +349,7 @@ jobs:
     steps:
 
       - name: 🤘 Checkout Code
-        uses: actions/checkout@v6 # https://github.com/actions/checkout
+        uses: actions/checkout@v7 # https://github.com/actions/checkout
 
       - name: Use own action - test latest version
         uses: ./

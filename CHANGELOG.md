@@ -11,6 +11,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - "It was a bright day in April, and the clocks were striking thirteen." - 1984
 
+## [1.6.0] - 2026-06-26
+
+### Changed
+- replaced `@vercel/ncc` with `esbuild` for bundling (ncc can't bundle ESM-only packages)
+- dropped intermediate `tsc` step: esbuild compiles TypeScript directly
+- migrated build output from CJS to ESM
+
+### Added
+- `typecheck` script: `tsc --noEmit` for type-checking only
+- Jest `moduleNameMapper` + manual mocks for ESM-only `@actions/*` packages
+
+### Updated
+- all `@actions/*` deps to latest major versions (ESM-only)
+- `@types/node` → 26, `typescript` → 6, `esbuild` → 0.28
+
+### Removed
+- `@vercel/ncc`
+- `lib/` output folder
+- `dist/*.js.map` source maps
+
+## [1.5.5] - 2026-05-26
+
+### Fixed
+- raise Node version to 24 to avoid Node20 deprecation warning
+
+## [1.5.4] - 2026-05-25
+
+### Fixed
+- Fixed CMake `FindVulkan` failure on Linux for SDK >= 1.4.350.0 where LunarG moved the loader to `lib/VulkanLoader/lib/`. [#581]
+  - After extraction, symlinks are now created in `$VULKAN_SDK/lib/` so CMake finds the library at the expected location
+  - `LD_LIBRARY_PATH` also includes the new `VulkanLoader/lib` path for direct runtime access
+   - Full backward compatibility: no-op for older SDK versions and non-Linux platforms
+
+### Added
+- added integration test for Vulkan SDK verification (extends [#582])
+- Added `installLavapipeLinux()`, which installs lavapipe on Linux via system package manager [#578]
+
+## [1.5.3] - 2026-05-20
+
+### Fixed
+- Fixed version mismatch on cache restore by removing the prefix fallback cache key. [#580]
+  - Only exact version matches now restore from cache
+  - This prevents stale SDK data from being served on Linux/macOS and
+    silently writing into wrong/old version paths on Windows.
+
+## [1.5.2] - 2026-05-09
+
+## Changed
+  - security update: fast-xml-builder v1.1.5 to v1.2.0 (CVE-2026-44665)
+  - (internal) updated DevContainer
+    - update to Node v24 LTS
+    - removed usage of container features
+    - moved zsh install to Dockerfile
+
+## [1.5.1] - 2026-04-24
+
+## Added
+
+- added input variable `cache_save_if`: to pass in a configurable condition to control saving the cache (defaults to true). [#558]
+
+## Changed
+
+- changed Vulkan SDK caching mechanism
+  - It no longer saves on pushes to main. Instead, the `cache_save_if` input is used to decide when to save to cache. This provides flexibility for users to configure the caching policy.
+
+## [1.5.0] - 2026-04-23
+
+### Changed
+- raise Node version to 24
+- changed Vulkan SDK caching mechanism:
+  - implemented a main-only producer model for cache writes
+  - removed cache writes from non-main branches and pull requests
+  - added environment variable checks to ensure cache writes only occur in main push events
+  - updated tests to simulate main push environment for cache write scenarios
+  - this means: PRs and non-main branches will no longer write to the cache,
+    but can still read from it if a main branch has previously written a compatible cache entry
+
+## Fixed
+- fixed warning: Can't add secret mask for empty string, when calling core.setSecret
+- downgraded all @actions/* packages to pre-ESM majors, because of audit and resolve issues with ESM versions
+
 ## [1.4.0] - 2026-01-08
 
 ### Added
@@ -201,7 +282,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Section for Reference Links -->
 
-[vNext]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.4.0...HEAD
+[vNext]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.5...v1.6.0
+[1.5.5]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.4...v1.5.5
+[1.5.4]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.3...v1.5.4
+[1.5.3]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.2...v1.5.3
+[1.5.2]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.2.8...v1.3.0
 [1.2.8]: https://github.com/jakoch/install-vulkan-sdk-action/compare/v1.2.7...v1.2.8

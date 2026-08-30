@@ -14,23 +14,38 @@ import * as installerLavapipe from './installer_lavapipe'
 import * as installerSwiftshader from './installer_swiftshader'
 import * as installerVulkan from './installer_vulkan'
 import * as platform from './platform'
+import * as versions from './versions'
 import * as versionsVulkan from './versions_vulkan'
 
 /**
  * Get Cache Keys
  *
- * Format will be "cache-OS-ARCH-vulkan-sdk-VERSION-HASH".
- * E.g. "cache-linux-x64-vulkan-sdk-1.3.250.1-hash".
+ * Cache behaviour
+ * - We use a main-only producer model for SDK caching.
+ * - Only the main branch is allowed to write/update the cache.
+ *   - see cache.saveCache() with check for branch name "main"
+ * - It's a single shared cache per OS/ARCH/version.
+ * - All workflows (PRs, pushes, schedules, manual runs) only restore from this cache.
+ * - There are no branch specific caches.
+ *
+ * Format:
+ *   Key: "cache-OS-ARCH-vulkan-sdk-VERSION"
+ *
+ * Example:
+ *   "cache-linux-x64-vulkan-sdk-1.3.250.1"
  *
  * @param {string} version - The Vulkan SDK version.
- * @return { cachePrimaryKey: string; cacheRestoreKeys: string[]; }
  */
 export function getCacheKeys(version: string): { cachePrimaryKey: string; cacheRestoreKeys: string[] } {
-  // Note: getPlatform() is used to get "windows", instead of OS_PLATFORM value "win32"
-  const cachePrimaryKey = `cache-${platform.getPlatform()}-${platform.OS_ARCH}-vulkan-sdk-${version}`
-  const cacheRestoreKey1 = `cache-${platform.getPlatform()}-${platform.OS_ARCH}-vulkan-sdk-`
-  const cacheRestoreKey2 = `cache-${platform.getPlatform()}-${platform.OS_ARCH}-`
-  return { cachePrimaryKey, cacheRestoreKeys: [cacheRestoreKey1, cacheRestoreKey2] }
+  const os = platform.getPlatform() || 'unknown'
+  const arch = platform.OS_ARCH || 'x64'
+
+  const cacheKey = `cache-${os}-${arch}-vulkan-sdk-${version}`
+
+  return {
+    cachePrimaryKey: cacheKey,
+    cacheRestoreKeys: [cacheKey]
+  }
 }
 
 /**
@@ -38,19 +53,21 @@ export function getCacheKeys(version: string): { cachePrimaryKey: string; cacheR
  *
  * @param {string} version - The version of the Vulkan SDK to install.
  * @param {string} destination - The directory where the Vulkan SDK will be installed.
- * @param {string[]} optional_components - An array of optional components to install alongside the SDK.
- * @param {boolean} use_cache - Whether to use a cached SDK, if available. And store SDK to cache, if not available.
+ * @param {string[]} optionalComponents - An array of optional components to install alongside the SDK.
  * @param {boolean} stripdown - Whether to reduce the size of the installed SDK for caching.
- * @param {boolean} install_runtime - Whether to install the Vulkan runtime.
+ * @param {boolean} installRuntime - Whether to install the Vulkan runtime.
+ * @param {boolean} useCache - Whether to enable caching of the Vulkan SDK installation for future runs.
+ * @param {boolean} cacheSaveIf - Condition, to control when to save the cache (e.g. only on main or another condition).
  * @return {*}  {Promise<string>} A Promise that resolves to the path where the Vulkan SDK is installed.
  */
 async function getVulkanSdk(
   version: string,
   destination: string,
   optionalComponents: string[],
-  useCache: boolean,
   stripdown: boolean,
-  installRuntime: boolean
+  installRuntime: boolean,
+  useCache: boolean,
+  cacheSaveIf: boolean
 ): Promise<string> {
   let installPath: string
 
@@ -100,8 +117,14 @@ async function getVulkanSdk(
     }
   }
 
-  // cache install folder
-  if (useCache) {
+  /*
+    Cache the installed SDK for future runs.
+    By default the action saves the cache. The `cacheSaveIf` input allows users
+    to control when the cache is written (e.g. only on main or another condition).
+   */
+  const canWriteCache = useCache && cacheSaveIf
+
+  if (canWriteCache) {
     if (stripdown) {
       installerVulkan.stripdownInstallationOfSdk(installPath)
     }
@@ -166,9 +189,10 @@ export async function run(): Promise<void> {
         version,
         inputs.destination,
         inputs.optionalComponents,
-        inputs.useCache,
         inputs.stripdown,
-        inputs.installRuntime
+        inputs.installRuntime,
+        inputs.useCache,
+        inputs.cacheSaveIf
       )
 
       const installPath = installerVulkan.getVulkanSdkPath(sdkPath, version)
@@ -202,7 +226,12 @@ export async function run(): Promise<void> {
 
           // export LD_LIBRARY_PATH=$VULKAN_SDK/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
           const ldLibraryPath = process.env.LD_LIBRARY_PATH || ''
-          const vkLdLibraryPath = `${installPath}/lib:${ldLibraryPath}`
+          let vkLdLibraryPath = `${installPath}/lib`
+          // Starting from SDK 1.4.350.0, the loader is under lib/VulkanLoader/lib/
+          if (versions.compare(version, '1.4.350.0') >= 0) {
+            vkLdLibraryPath = `${installPath}/lib/VulkanLoader/lib:${vkLdLibraryPath}`
+          }
+          vkLdLibraryPath = `${vkLdLibraryPath}:${ldLibraryPath}`
           if (platform.IS_LINUX || platform.IS_LINUX_ARM) {
             core.exportVariable('LD_LIBRARY_PATH', vkLdLibraryPath)
             core.info(`✔️ [ENV] Set env variable LD_LIBRARY_PATH -> "${vkLdLibraryPath}".`)
@@ -249,14 +278,19 @@ export async function run(): Promise<void> {
      * Install Lavapipe
      * ---------------------------------------------------------------------- */
 
-    if (platform.IS_WINDOWS && inputs.installLavapipe) {
+    if ((platform.IS_WINDOWS || platform.IS_LINUX || platform.IS_LINUX_ARM) && inputs.installLavapipe) {
       core.info(`🚀 Installing Lavapipe library...`)
       const lavapipeInstallPath = await installerLavapipe.installLavapipe(inputs.lavapipeDestination, inputs.useCache)
-      if (installerLavapipe.verifyInstallation(lavapipeInstallPath)) {
-        core.info(`ℹ️ [INFO] Path to Lavapipe: ${lavapipeInstallPath}`)
-        installerLavapipe.setupLavapipe(lavapipeInstallPath)
-      } else {
-        core.warning(`Could not find Lavapipe in ${lavapipeInstallPath}`)
+
+      // On Linux, apt-get exits non-zero on failure, so a successful return is authoritative.
+      // Skip verifyInstallation because it checks hardcoded system paths, not the returned path.
+      if (platform.IS_WINDOWS) {
+        if (installerLavapipe.verifyInstallation(lavapipeInstallPath)) {
+          core.info(`ℹ️ [INFO] Path to Lavapipe: ${lavapipeInstallPath}`)
+          installerLavapipe.setupLavapipe(lavapipeInstallPath)
+        } else {
+          core.warning(`Could not find Lavapipe in ${lavapipeInstallPath}`)
+        }
       }
     }
 

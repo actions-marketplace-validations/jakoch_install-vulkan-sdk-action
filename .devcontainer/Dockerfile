@@ -12,7 +12,8 @@ RUN echo "Packages" && \
     git git-lfs \
     jq \
     grep ripgrep \
-    zip unzip xz-utils xzdec && \
+    zip unzip xz-utils xzdec \
+    zsh zsh zsh-autosuggestions zsh-syntax-highlighting && \
     # Cleanup
     apt-get autoremove -y && \
     apt-get clean autoclean && \
@@ -21,7 +22,8 @@ RUN echo "Packages" && \
 RUN echo "Setup npm, node, yarn" && \
 	  # Setup n (Node.js version manager)
     npm install -g n@latest && \
-    n 20.18.1 && \
+    # v24 LTS
+    n 24.15.0 && \
 	  node --version && \
     # Setup npm (Node.js package manager)
     npm install -g npm@latest && \

@@ -18,6 +18,10 @@ jest.mock('../src/platform')
 jest.mock('@actions/cache')
 jest.mock('@actions/core')
 
+// Ensure tests that expect cache writes simulate a main push environment
+process.env.GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME ?? 'push'
+process.env.GITHUB_REF = process.env.GITHUB_REF ?? 'refs/heads/main'
+
 // Import mocked modules
 import * as downloader from '../src/downloader'
 import * as installer_vulkan from '../src/installer_vulkan'
@@ -95,10 +99,8 @@ describe('getCacheKeys', () => {
     const result = main.getCacheKeys('1.2.3.4')
     expect(result.cachePrimaryKey).toContain('cache-')
     expect(result.cachePrimaryKey).toContain('vulkan-sdk-1.2.3.4')
-    expect(result.cacheRestoreKeys).toHaveLength(2)
-    expect(result.cacheRestoreKeys[0]).toContain('cache-')
-    expect(result.cacheRestoreKeys[0]).toContain('vulkan-sdk-')
-    expect(result.cacheRestoreKeys[1]).toContain('cache-')
+    expect(result.cacheRestoreKeys).toHaveLength(1)
+    expect(result.cacheRestoreKeys[0]).toContain('vulkan-sdk-1.2.3.4')
   })
 })
 
@@ -114,6 +116,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: false,
@@ -150,8 +153,23 @@ describe('run', () => {
     ;(core.exportVariable as jest.MockedFunction<typeof core.exportVariable>).mockImplementation(mockExportVariable)
     ;(core.info as jest.MockedFunction<typeof core.info>).mockImplementation(mockInfo)
 
-    // Run the function
-    await main.run()
+    // Run the function (simulate main push so cache is saved)
+    const _oldEventName = process.env.GITHUB_EVENT_NAME
+    const _oldRef = process.env.GITHUB_REF
+    try {
+      process.env.GITHUB_EVENT_NAME = 'push'
+      process.env.GITHUB_REF = 'refs/heads/main'
+      // sanity check: ensure env vars are set for the test
+      expect(process.env.GITHUB_EVENT_NAME).toBe('push')
+      expect(process.env.GITHUB_REF).toBe('refs/heads/main')
+      // debug
+      await main.run()
+    } finally {
+      if (typeof _oldEventName === 'undefined') delete process.env.GITHUB_EVENT_NAME
+      else process.env.GITHUB_EVENT_NAME = _oldEventName
+      if (typeof _oldRef === 'undefined') delete process.env.GITHUB_REF
+      else process.env.GITHUB_REF = _oldRef
+    }
 
     // Verify calls
     expect(inputs.getInputs).toHaveBeenCalled()
@@ -173,6 +191,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: true,
@@ -223,6 +242,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: false,
@@ -295,6 +315,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: true,
+      cacheSaveIf: true,
       stripdown: true,
       installRuntime: false,
       installRuntimeOnly: false,
@@ -353,6 +374,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: true,
       installRuntimeOnly: false,
@@ -400,6 +422,58 @@ describe('run', () => {
     expect(mockInfo).toHaveBeenCalledWith('ℹ️ [INFO] Path to Vulkan Runtime: /fake/sdk/path/runtime')
   })
 
+  test('should install Lavapipe on Linux', async () => {
+    // Mock inputs
+    const mockInputs = {
+      version: '1.3.250.1',
+      destination: '/fake/dest',
+      optionalComponents: [],
+      useCache: false,
+      cacheSaveIf: true,
+      stripdown: false,
+      installRuntime: false,
+      installRuntimeOnly: false,
+      installSwiftshader: false,
+      installLavapipe: true,
+      swiftshaderDestination: '',
+      lavapipeDestination: '/fake/lavapipe',
+      githubToken: ''
+    }
+    ;(inputs.getInputs as jest.MockedFunction<typeof inputs.getInputs>).mockResolvedValue(mockInputs)
+
+    ;(versionsVulkan.resolveVersion as jest.MockedFunction<typeof versionsVulkan.resolveVersion>).mockResolvedValue('1.3.250.1')
+
+    ;(downloader.downloadVulkanSdk as jest.MockedFunction<typeof downloader.downloadVulkanSdk>).mockResolvedValue('/fake/download/path')
+
+    ;(installer_vulkan.installVulkanSdk as jest.MockedFunction<typeof installer_vulkan.installVulkanSdk>).mockResolvedValue('/fake/install/path')
+    ;(installer_vulkan.getVulkanSdkPath as jest.MockedFunction<typeof installer_vulkan.getVulkanSdkPath>).mockReturnValue('/fake/sdk/path')
+    ;(installer_vulkan.verifyInstallationOfSdk as jest.MockedFunction<typeof installer_vulkan.verifyInstallationOfSdk>).mockReturnValue(true)
+
+    // Mock Lavapipe installer
+    ;(installer_lavapipe.installLavapipe as jest.MockedFunction<typeof installer_lavapipe.installLavapipe>).mockResolvedValue('/usr')
+    jest.mocked(installer_lavapipe.verifyInstallation).mockReturnValue(true)
+
+    // Mock platform as Linux
+    Object.defineProperty(platform, 'IS_WINDOWS', { value: false, writable: true })
+    Object.defineProperty(platform, 'IS_WINDOWS_ARM', { value: false, writable: true })
+    Object.defineProperty(platform, 'IS_LINUX', { value: true, writable: true })
+    Object.defineProperty(platform, 'IS_LINUX_ARM', { value: false, writable: true })
+    Object.defineProperty(platform, 'IS_MAC', { value: false, writable: true })
+
+    // Mock core functions
+    const mockAddPath = jest.fn()
+    const mockExportVariable = jest.fn()
+    const mockInfo = jest.fn()
+    ;(core.addPath as jest.MockedFunction<typeof core.addPath>).mockImplementation(mockAddPath)
+    ;(core.exportVariable as jest.MockedFunction<typeof core.exportVariable>).mockImplementation(mockExportVariable)
+    ;(core.info as jest.MockedFunction<typeof core.info>).mockImplementation(mockInfo)
+
+    await main.run()
+
+    expect(installer_lavapipe.installLavapipe).toHaveBeenCalledWith('/fake/lavapipe', false)
+    expect(mockInfo).toHaveBeenCalledWith('✅ Done.')
+  })
+
   test('should install Lavapipe on Windows', async () => {
     // Mock inputs
     const mockInputs = {
@@ -407,6 +481,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: false,
@@ -431,10 +506,6 @@ describe('run', () => {
 
     // Mock Lavapipe installer
     ;(installer_lavapipe.installLavapipe as jest.MockedFunction<typeof installer_lavapipe.installLavapipe>).mockResolvedValue('/fake/lavapipe/path')
-    ;(installer_lavapipe.setupLavapipe as unknown as jest.Mock).mockReturnValue({
-      icd: ['/fake/lavapipe/icd.json'],
-      binPath: ['/fake/lavapipe/bin'],
-    })
 
     // Mock platform
     Object.defineProperty(platform, 'IS_WINDOWS', { value: true, writable: true })
@@ -461,6 +532,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: false,
@@ -498,6 +570,56 @@ describe('run', () => {
     expect(mockWarning).toHaveBeenCalledWith('Could not find Vulkan SDK in /fake/sdk/path')
   })
 
+  test('should include VulkanLoader/lib in LD_LIBRARY_PATH for Linux >= 1.4.350.0', async () => {
+    // Mock inputs
+    const mockInputs = {
+      version: '1.4.350.0',
+      destination: '/fake/dest',
+      optionalComponents: [],
+      useCache: false,
+      cacheSaveIf: true,
+      stripdown: false,
+      installRuntime: false,
+      installRuntimeOnly: false,
+      installSwiftshader: false,
+      installLavapipe: false,
+      swiftshaderDestination: '',
+      lavapipeDestination: '',
+      githubToken: ''
+    }
+    ;(inputs.getInputs as jest.MockedFunction<typeof inputs.getInputs>).mockResolvedValue(mockInputs)
+
+    ;(versionsVulkan.resolveVersion as jest.MockedFunction<typeof versionsVulkan.resolveVersion>).mockResolvedValue('1.4.350.0')
+
+    ;(downloader.downloadVulkanSdk as jest.MockedFunction<typeof downloader.downloadVulkanSdk>).mockResolvedValue('/fake/download/path')
+
+    ;(installer_vulkan.installVulkanSdk as jest.MockedFunction<typeof installer_vulkan.installVulkanSdk>).mockResolvedValue('/fake/install/path')
+    ;(installer_vulkan.getVulkanSdkPath as jest.MockedFunction<typeof installer_vulkan.getVulkanSdkPath>).mockReturnValue('/fake/sdk/path')
+    ;(installer_vulkan.verifyInstallationOfSdk as jest.MockedFunction<typeof installer_vulkan.verifyInstallationOfSdk>).mockReturnValue(true)
+
+    Object.defineProperty(platform, 'IS_WINDOWS', { value: false, writable: true })
+    Object.defineProperty(platform, 'IS_LINUX', { value: true, writable: true })
+
+    const originalEnv = process.env.LD_LIBRARY_PATH
+    process.env.LD_LIBRARY_PATH = '/existing/path'
+
+    const mockAddPath = jest.fn()
+    const mockExportVariable = jest.fn()
+    const mockInfo = jest.fn()
+    ;(core.addPath as jest.MockedFunction<typeof core.addPath>).mockImplementation(mockAddPath)
+    ;(core.exportVariable as jest.MockedFunction<typeof core.exportVariable>).mockImplementation(mockExportVariable)
+    ;(core.info as jest.MockedFunction<typeof core.info>).mockImplementation(mockInfo)
+
+    await main.run()
+
+    expect(mockExportVariable).toHaveBeenCalledWith(
+      'LD_LIBRARY_PATH',
+      '/fake/sdk/path/lib/VulkanLoader/lib:/fake/sdk/path/lib:/existing/path'
+    )
+
+    process.env.LD_LIBRARY_PATH = originalEnv
+  })
+
   test('should set DYLD_LIBRARY_PATH on macOS', async () => {
     // Mock inputs
     const mockInputs = {
@@ -505,6 +627,7 @@ describe('run', () => {
       destination: '/fake/dest',
       optionalComponents: [],
       useCache: false,
+      cacheSaveIf: true,
       stripdown: false,
       installRuntime: false,
       installRuntimeOnly: false,

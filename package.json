@@ -1,30 +1,35 @@
 {
   "name": "install-vulkan-sdk-action",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "private": true,
   "description": "A Github Action installing the Vulkan SDK and Runtime.",
   "author": "Jens A. Koch",
+  "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/jakoch/install-vulkan-sdk-action#readme",
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/index.js --minify --legal-comments=external --banner:js='import{createRequire as __createRequire}from\"module\";var require=__createRequire(import.meta.url);'",
     "format:check": "npx @biomejs/biome format",
     "format:write": "npx @biomejs/biome format --write",
     "lint:check": "npx @biomejs/biome lint",
     "lint:fix": "npx @biomejs/biome lint --write",
     "local:run": "npx @github/local-action run . ./src/main.ts env.local",
-    "package": "ncc build --source-map --minify",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build",
     "test": "jest --verbose --detectOpenHandles --runInBand",
     "test:cov": "jest --verbose --coverage",
     "test:nocache": "jest --verbose --detectOpenHandles --runInBand --no-cache",
     "npm:audit": "npm audit --audit-level=high fix",
+    "npm:audit_json": "npm audit --json --audit-level=moderate > audit.json",
     "npm:outdated": "npm outdated",
     "npm:clean_install": "npm clean-install --no-audit --strict-peer-deps",
     "npm:install": "npm install --no-audit --strict-peer-deps",
     "npm:update": "npm update --no-audit --strict-peer-deps",
     "prepare": "husky",
     "pre-commit": "npm run all",
-    "all": "npm run format:write && npm run build && npm run npm:audit && npm run package && npm test"
+    "all": "npm run format:write && npm run typecheck && npm run npm:audit && npm run package && npm test",
+    "_comment_1": "devDependency: @github/local-action ^7.0.0 is required for local testing (local:run), but was removed due to audit issues.",
+    "_comment_2": "jest.config.js renamed to jest.config.cjs because package.json has type: module. Jest config uses module.exports (CJS)."
   },
   "keywords": [
     "actions",
@@ -33,24 +38,23 @@
     "setup",
     "install"
   ],
-  "main": "lib/main.js",
+  "main": "dist/index.js",
   "dependencies": {
-    "@actions/cache": "^5",
-    "@actions/core": "^2",
-    "@actions/http-client": "^3",
-    "@actions/io": "^2",
-    "@actions/tool-cache": "^3"
+    "@actions/cache": "^6",
+    "@actions/core": "^3",
+    "@actions/http-client": "^4",
+    "@actions/io": "^3",
+    "@actions/tool-cache": "^4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2",
-    "@github/local-action": "^7.0.0",
     "@types/jest": "^30",
-    "@types/node": "^25.0",
-    "@vercel/ncc": "^0.38.4",
+    "@types/node": "^26.1",
+    "esbuild": "^0.28.0",
     "husky": "^9.1.7",
     "jest": "^30",
     "ts-jest": "^29",
-    "typescript": "^5.9.2"
+    "typescript": "^6.0"
   },
   "repository": {
     "type": "git",
@@ -60,7 +64,7 @@
     "url": "https://github.com/jakoch/install-vulkan-sdk-action/issues"
   },
   "engines": {
-    "node": ">=20.18.1",
+    "node": ">=24",
     "npm": ">=10.8.0"
   }
 }
